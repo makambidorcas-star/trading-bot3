@@ -1,48 +1,39 @@
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.get_json(force=True) or {}
-        print("WEBHOOK DATA:", data)
+        # Works for both JSON and raw text payloads from TradingView
+        data = request.get_json(silent=True)
 
-        # Required fields
+        if data is None:
+            data = request.data.decode("utf-8")
+            print("RAW WEBHOOK:", data)
+            return jsonify({"status": "received_raw"}), 200
+
+        print("WEBHOOK:", data)
+
+        # direct pass-through (no filtering logic)
         symbol = data.get("symbol")
         side = data.get("side")
-
-        # Validate required strings
-        if not symbol or not side:
-            return jsonify({"error": "Missing symbol or side"}), 400
-
-        # SL / TP safe parsing
-        sl_raw = data.get("sl")
-        tp_raw = data.get("tp")
-
-        if sl_raw is None or tp_raw is None:
-            return jsonify({"error": "Missing SL or TP"}), 400
-
-        try:
-            sl = float(sl_raw)
-            tp = float(tp_raw)
-        except (TypeError, ValueError):
-            return jsonify({"error": "SL/TP must be numeric"}), 400
-
-        # Optional fields (safe defaults)
-        risk = float(data.get("risk", 1))
+        sl = data.get("sl")
+        tp = data.get("tp")
         qty = data.get("qty")
+        risk = data.get("risk")
 
-        # Log final parsed values
-        print(f"PARSED → symbol={symbol}, side={side}, sl={sl}, tp={tp}, risk={risk}, qty={qty}")
+        print(f"EXEC → {symbol} {side} SL={sl} TP={tp} qty={qty} risk={risk}")
 
-        # ---- YOUR TRADING LOGIC HERE ----
+        # EXECUTE HERE
         # place_order(symbol, side, qty, sl, tp)
 
-        return jsonify({
-            "status": "success",
-            "symbol": symbol,
-            "side": side,
-            "sl": sl,
-            "tp": tp
-        })
+        return jsonify({"status": "ok"}), 200
 
     except Exception as e:
         print("WEBHOOK ERROR:", str(e))
-        return jsonify({"error": "internal error"}), 500
+        return jsonify({"error": "server error"}), 500
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
