@@ -1,39 +1,28 @@
 from binance.client import Client
-from config import API_KEY, SECRET_KEY
 
-client = Client(API_KEY, SECRET_KEY)
+API_KEY = "YOUR_API_KEY"
+API_SECRET = "YOUR_API_SECRET"
 
-def place_order(symbol, side, quantity):
+client = Client(API_KEY, API_SECRET)
+
+
+def place_order(symbol, side, qty, sl=None, tp=None):
     try:
-        print(f"[TRADE] {side} {quantity} {symbol}")
+        print("=== ORDER FUNCTION HIT ===")
+
+        order_side = Client.SIDE_BUY if side.upper() == "BUY" else Client.SIDE_SELL
 
         order = client.create_order(
             symbol=symbol,
-            side=side,
-            type="MARKET",
-            quantity=quantity
+            side=order_side,
+            type=Client.ORDER_TYPE_MARKET,
+            quantity=qty
         )
+
+        print("ORDER RESPONSE:", order)
 
         return order
 
     except Exception as e:
-        print("Order error:", e)
+        print("BINANCE ERROR:", e)
         return None
-
-
-def get_balance(asset="USDT"):
-    try:
-        balance = client.get_asset_balance(asset=asset)
-        return float(balance["free"])
-    except Exception as e:
-        print("Balance error:", e)
-        return 0
-
-
-def get_price(symbol):
-    try:
-        ticker = client.get_symbol_ticker(symbol=symbol)
-        return float(ticker["price"])
-    except Exception as e:
-        print("Price error:", e)
-        return 0
