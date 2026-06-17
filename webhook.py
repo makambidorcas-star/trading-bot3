@@ -1,42 +1,48 @@
-from flask import Flask, request, jsonify
-from binance_api import place_order, get_balance
-from risk import calculate_position_size
-
-app = Flask(__name__)
-
-SECRET_KEY = "amsee123"
-
-
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    data = request.json
-    print("Signal received:", data)
+    try:
+        data = request.get_json(force=True) or {}
+        print("WEBHOOK DATA:", data)
 
-    if data.get("key") != SECRET_KEY:
-        return {"status": "rejected"}, 403
+        # Required fields
+        symbol = data.get("symbol")
+        side = data.get("side")
 
-    action = data.get("action")
-    symbol = data.get("symbol")
-    entry = float(data.get("entry"))
-    sl = float(data.get("sl"))
+        # Validate required strings
+        if not symbol or not side:
+            return jsonify({"error": "Missing symbol or side"}), 400
 
-    balance = get_balance("USDT")
-    qty = calculate_position_size(balance, entry, sl)
+        # SL / TP safe parsing
+        sl_raw = data.get("sl")
+        tp_raw = data.get("tp")
 
-    if qty <= 0:
-        return {"status": "invalid_size"}, 200
+        if sl_raw is None or tp_raw is None:
+            return jsonify({"error": "Missing SL or TP"}), 400
 
-    if action.upper() == "BUY":
-        place_order(symbol, "BUY", qty)
-    elif action.upper() == "SELL":
-        place_order(symbol, "SELL", qty)
+        try:
+            sl = float(sl_raw)
+            tp = float(tp_raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "SL/TP must be numeric"}), 400
 
-    return jsonify({
-        "status": "executed",
-        "symbol": symbol,
-        "qty": qty
-    })
+        # Optional fields (safe defaults)
+        risk = float(data.get("risk", 1))
+        qty = data.get("qty")
 
+        # Log final parsed values
+        print(f"PARSED → symbol={symbol}, side={side}, sl={sl}, tp={tp}, risk={risk}, qty={qty}")
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+        # ---- YOUR TRADING LOGIC HERE ----
+        # place_order(symbol, side, qty, sl, tp)
+
+        return jsonify({
+            "status": "success",
+            "symbol": symbol,
+            "side": side,
+            "sl": sl,
+            "tp": tp
+        })
+
+    except Exception as e:
+        print("WEBHOOK ERROR:", str(e))
+        return jsonify({"error": "internal error"}), 500
